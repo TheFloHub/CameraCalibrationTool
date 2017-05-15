@@ -43,11 +43,13 @@ int main(int argc, char *argv[])
 	}
 
 	std::vector<cv::Mat> images;
-	images.push_back(cv::imread("D:\\Projekte\\Pics\\c1.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread("D:\\Projekte\\Pics\\c2.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread("D:\\Projekte\\Pics\\c3.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread("D:\\Projekte\\Pics\\c4.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread("D:\\Projekte\\Pics\\c5.jpg", cv::IMREAD_GRAYSCALE));
+	std::string imagePath = "D:\\Eigene Dokumente\\Visual Studio 2015\\Projects\\Pics\\";
+	//std::string imagePath = "D:\\Projekte\\Pics\\";
+	images.push_back(cv::imread(imagePath + "c1.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "c2.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "c3.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "c4.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "c5.jpg", cv::IMREAD_GRAYSCALE));
 
 	std::vector<Eigen::Array2Xd> imagePointsPerFrame;
 	std::vector<std::vector<Cvl::Match>> matchesPerFrame;
