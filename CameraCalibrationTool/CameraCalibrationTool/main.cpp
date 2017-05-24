@@ -6,6 +6,10 @@
 #include <ComputerVisionLib/CameraModel/CameraModel.h>
 #include <ComputerVisionLib/CameraModel/DistortionModel/BrownModel.h>
 #include <ComputerVisionLib/CameraModel/ProjectionModel/PinholeModel.h>
+#include <ComputerVisionLib/CameraModel/ProjectionModel/EquidistantModel.h>
+#include <ComputerVisionLib/CameraModel/ProjectionModel/EquisolidModel.h>
+#include <ComputerVisionLib/CameraModel/ProjectionModel/OrthographicModel.h>
+#include <ComputerVisionLib/CameraModel/ProjectionModel/StereographicModel.h>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -53,8 +57,30 @@ void testCircle()
 }
 
 
+void testProjectionModel()
+{
+	Eigen::Array2Xd normalizedCameraPoints(2, 6);
+	double v = 0.2;
+	normalizedCameraPoints.col(0) = Eigen::Vector2d( v,  v);
+	normalizedCameraPoints.col(1) = Eigen::Vector2d( 2*v, -2 * v);
+	normalizedCameraPoints.col(2) = Eigen::Vector2d(-4 * v, 4 * v);
+	normalizedCameraPoints.col(3) = Eigen::Vector2d(-8 * v, -8 * v);
+	normalizedCameraPoints.col(4) = Eigen::Vector2d(-16 * v, -16 * v);
+	normalizedCameraPoints.col(5) = Eigen::Vector2d(-32 * v, -32 * v);
+	
+	Cvl::StereographicModel model(-1200.0, -600.0, 0.0, 0.0); // PinholeModel EquidistantModel EquisolidModel StereographicModel OrthographicModel
+	Eigen::Array2Xd imagePoints = model.project(normalizedCameraPoints);
+	std::cout << imagePoints << std::endl << std::endl;
+	Eigen::Array2Xd comparePoints = model.unproject(imagePoints);
+	std::cout << comparePoints << std::endl << std::endl;
+	
+	std::cout << normalizedCameraPoints - comparePoints << std::endl;
+	system("pause");
+}
+
 void someTests()
 {
+	testProjectionModel();
 	//Eigen::Vector4d vec(1,2,3,4);
 	//std::cout << vec.tail(2) << std::endl;
 }
