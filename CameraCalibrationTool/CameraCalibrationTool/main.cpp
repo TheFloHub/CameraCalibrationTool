@@ -78,9 +78,32 @@ void testProjectionModel()
 	system("pause");
 }
 
+void testDistortionModel()
+{
+	Eigen::Array2Xd normalizedCameraPoints(2, 6);
+	double v = 0.2;
+	normalizedCameraPoints.col(0) = Eigen::Vector2d(v, v);
+	normalizedCameraPoints.col(1) = Eigen::Vector2d(2 * v, -2 * v);
+	normalizedCameraPoints.col(2) = Eigen::Vector2d(-4 * v, 4 * v);
+	normalizedCameraPoints.col(3) = Eigen::Vector2d(-8 * v, -8 * v);
+	normalizedCameraPoints.col(4) = Eigen::Vector2d(-16 * v, -16 * v);
+	normalizedCameraPoints.col(5) = Eigen::Vector2d(-32 * v, -32 * v);
+
+	Cvl::BrownModel model(0.5, 0.1, 0.2, 0.2);
+	std::cout << "START" << std::endl;
+	Eigen::Array2Xd distortedPoints = model.distort(normalizedCameraPoints);
+	std::cout << distortedPoints << std::endl << std::endl;
+	Eigen::Array2Xd comparePoints = model.undistort(distortedPoints);
+	std::cout << comparePoints << std::endl << std::endl;
+
+	std::cout << normalizedCameraPoints - comparePoints << std::endl;
+	system("pause");
+}
+
 void someTests()
 {
-	testProjectionModel();
+	//testProjectionModel();
+	//testDistortionModel();
 	//Eigen::Vector4d vec(1,2,3,4);
 	//std::cout << vec.tail(2) << std::endl;
 }
@@ -105,12 +128,16 @@ int main(int argc, char *argv[])
 
 	std::vector<cv::Mat> images;
 	//std::string imagePath = "D:\\Eigene Dokumente\\Visual Studio 2015\\Projects\\Pics\\";
-	std::string imagePath = "D:\\Projekte\\Pics\\";
-	images.push_back(cv::imread(imagePath + "c1.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread(imagePath + "c2.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread(imagePath + "c3.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread(imagePath + "c4.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread(imagePath + "c5.jpg", cv::IMREAD_GRAYSCALE));
+	//std::string imagePath = "D:\\Projekte\\Pics\\";
+	std::string imagePath = "D:\\Projekte\\HandyCam\\Fisheye\\";
+
+	images.push_back(cv::imread(imagePath + "1.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "2.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "3.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "4.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "5.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "6.jpg", cv::IMREAD_GRAYSCALE));
+	images.push_back(cv::imread(imagePath + "7.jpg", cv::IMREAD_GRAYSCALE));
 
 	std::vector<Eigen::Array2Xd> imagePointsPerFrame;
 	std::vector<std::vector<Cvl::Match>> matchesPerFrame;
@@ -139,13 +166,11 @@ int main(int argc, char *argv[])
 			cv::putText(image, std::to_string(match.mTemplateId), cv::Point((int)p.x() + 5, (int)p.y() - 4), cv::FONT_HERSHEY_SIMPLEX, 0.5, 255, 1);
 		}
 
-		//cv::imshow("Points", image);
-		//cv::waitKey(0);
+		cv::imshow("Points", image);
+		cv::waitKey(0);
 	}
 
-	Cvl::CameraModel cameraModel(
-		std::unique_ptr<Cvl::DistortionModel>(new Cvl::BrownModel(0.0, 0.0, 0.0, 0.0)),
-		std::unique_ptr<Cvl::ProjectionModel>(new Cvl::PinholeModel(840.0, 850.0, 320.0, 240.0)));
+	Cvl::CameraModel cameraModel = Cvl::CameraModel::create<Cvl::EquidistantModel>(840.0, 850.0, 320.0, 240.0);
 	Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, cameraModel);
 
 
