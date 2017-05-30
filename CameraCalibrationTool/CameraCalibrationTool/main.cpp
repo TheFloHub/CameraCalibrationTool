@@ -165,8 +165,7 @@ int main(int argc, char *argv[])
 
 	std::vector<cv::Mat> images;
 	//std::string imagePath = "D:\\Eigene Dokumente\\Visual Studio 2015\\Projects\\Pics\\";
-	//std::string imagePath = "D:\\Projekte\\Pics\\";
-	std::string imagePath = "D:\\Projekte\\HandyCam\\Wide\\";
+	std::string imagePath = "D:\\Projekte\\HandyCam\\WebCam\\";
 
 	images.push_back(cv::imread(imagePath + "1.jpg", cv::IMREAD_GRAYSCALE));
 	images.push_back(cv::imread(imagePath + "2.jpg", cv::IMREAD_GRAYSCALE));

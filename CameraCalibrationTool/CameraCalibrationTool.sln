@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CameraCalibrationTool", "Ca
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ComputerVisionLib", "..\..\ComputerVisionLib\ComputerVisionSolution\ComputerVisionLib\ComputerVisionLib.vcxproj", "{88B95191-26A2-4DC4-A2D7-1C5F1F15D33A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LineScanner", "LineScanner\LineScanner.vcxproj", "{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{88B95191-26A2-4DC4-A2D7-1C5F1F15D33A}.Release|x64.Build.0 = Release|x64
 		{88B95191-26A2-4DC4-A2D7-1C5F1F15D33A}.Release|x86.ActiveCfg = Release|Win32
 		{88B95191-26A2-4DC4-A2D7-1C5F1F15D33A}.Release|x86.Build.0 = Release|Win32
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Debug|x64.ActiveCfg = Debug|x64
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Debug|x64.Build.0 = Debug|x64
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Debug|x86.ActiveCfg = Debug|Win32
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Debug|x86.Build.0 = Debug|Win32
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Release|x64.ActiveCfg = Release|x64
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Release|x64.Build.0 = Release|x64
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Release|x86.ActiveCfg = Release|Win32
+		{1ECB3C7B-51B1-407C-ABB0-3EDA688ACC6A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
