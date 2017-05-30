@@ -100,6 +100,43 @@ void testDistortionModel()
 	system("pause");
 }
 
+void testAllModels(
+	Eigen::Array2Xd const& templatePoints,
+	std::vector<Eigen::Array2Xd> const & imagePointsPerFrame,
+	std::vector<std::vector<Cvl::Match>> const & matchesPerFrame)
+{
+	Cvl::CameraModel pinholeModel = Cvl::CameraModel::create<Cvl::PinholeModel>(); 
+	Cvl::CameraModel equidistantModel = Cvl::CameraModel::create<Cvl::EquidistantModel>();
+	Cvl::CameraModel equisolidModel = Cvl::CameraModel::create<Cvl::EquisolidModel>();
+	Cvl::CameraModel orthographicModel = Cvl::CameraModel::create<Cvl::OrthographicModel>();
+	Cvl::CameraModel stereographicModel = Cvl::CameraModel::create<Cvl::StereographicModel>();
+
+	Cvl::CameraModel pinholeModelD = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::PinholeModel>();
+	Cvl::CameraModel equidistantModelD = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::EquidistantModel>();
+	Cvl::CameraModel equisolidModelD = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::EquisolidModel>();
+	Cvl::CameraModel orthographicModelD = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::OrthographicModel>();
+	Cvl::CameraModel stereographicModelD = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::StereographicModel>();
+
+	std::vector<std::tuple<bool, double>> results;
+
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, pinholeModel));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, equidistantModel));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, equisolidModel));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, orthographicModel));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, stereographicModel));
+
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, pinholeModelD));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, equidistantModelD));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, equisolidModelD));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, orthographicModelD));
+	results.push_back(Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, stereographicModelD));
+
+	for (auto const & result : results)
+	{
+		std::cout << std::get<0>(result) << " " << std::get<1>(result) << std::endl;
+	}
+}
+
 void someTests()
 {
 	//testProjectionModel();
@@ -129,15 +166,15 @@ int main(int argc, char *argv[])
 	std::vector<cv::Mat> images;
 	//std::string imagePath = "D:\\Eigene Dokumente\\Visual Studio 2015\\Projects\\Pics\\";
 	//std::string imagePath = "D:\\Projekte\\Pics\\";
-	std::string imagePath = "D:\\Projekte\\HandyCam\\Fisheye\\";
+	std::string imagePath = "D:\\Projekte\\HandyCam\\Wide\\";
 
 	images.push_back(cv::imread(imagePath + "1.jpg", cv::IMREAD_GRAYSCALE));
 	images.push_back(cv::imread(imagePath + "2.jpg", cv::IMREAD_GRAYSCALE));
 	images.push_back(cv::imread(imagePath + "3.jpg", cv::IMREAD_GRAYSCALE));
 	images.push_back(cv::imread(imagePath + "4.jpg", cv::IMREAD_GRAYSCALE));
 	images.push_back(cv::imread(imagePath + "5.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread(imagePath + "6.jpg", cv::IMREAD_GRAYSCALE));
-	images.push_back(cv::imread(imagePath + "7.jpg", cv::IMREAD_GRAYSCALE));
+	//images.push_back(cv::imread(imagePath + "6.jpg", cv::IMREAD_GRAYSCALE));
+	//images.push_back(cv::imread(imagePath + "7.jpg", cv::IMREAD_GRAYSCALE));
 
 	std::vector<Eigen::Array2Xd> imagePointsPerFrame;
 	std::vector<std::vector<Cvl::Match>> matchesPerFrame;
@@ -166,13 +203,15 @@ int main(int argc, char *argv[])
 			cv::putText(image, std::to_string(match.mTemplateId), cv::Point((int)p.x() + 5, (int)p.y() - 4), cv::FONT_HERSHEY_SIMPLEX, 0.5, 255, 1);
 		}
 
-		cv::imshow("Points", image);
-		cv::waitKey(0);
+		//cv::imshow("Points", image);
+		//cv::waitKey(0);
 	}
 
-	Cvl::CameraModel cameraModel = Cvl::CameraModel::create<Cvl::EquidistantModel>(840.0, 850.0, 320.0, 240.0);
-	Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, cameraModel);
+	// EquidistantModel EquisolidModel OrthographicModel StereographicModel PinholeModel
+	//Cvl::CameraModel cameraModel = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::PinholeModel>(); // Cvl::BrownModel, 
+	//Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, cameraModel);
 
+	testAllModels(templatePoints, imagePointsPerFrame, matchesPerFrame);
 
 	system("pause");
 	return 0;
