@@ -146,9 +146,85 @@ void someTests()
 }
 
 
-int main(int argc, char *argv[])
+void calibrateWebcam()
 {
-	someTests();
+	int const cornersPerRow = 11;
+	int const cornersPerCol = 8;
+	double const squareLength = 20; // mm
+	Eigen::Array2Xd templatePoints(2, cornersPerRow*cornersPerCol);
+	int templateIndex = 0;
+	for (int y = 0; y < cornersPerCol; ++y)
+	{
+		for (int x = 0; x < cornersPerRow; ++x)
+		{
+			templatePoints.col(templateIndex) = Eigen::Array2d(x*squareLength, y*squareLength);
+			++templateIndex;
+		}
+	}
+
+	// open video stream
+	cv::VideoCapture cap(0);
+	if (!cap.isOpened())
+	{
+		std::cout << "Could not open camera stream." << std::endl;
+		system("pause");
+		return;
+	}
+
+	// gather images
+	std::vector<cv::Mat> images;
+	cv::Mat imageC;
+	cv::Mat image;
+	while (images.size() < 8)
+	{
+		cap >> imageC;
+		cvtColor(imageC, image, cv::COLOR_BGR2GRAY);
+		cv::imshow("Image", image);
+		if (cv::waitKey(30) == 32)
+		{
+			images.push_back(image.clone());
+		}
+	}
+	cv::destroyAllWindows();
+
+	// evaluate images
+	std::vector<Eigen::Array2Xd> imagePointsPerFrame;
+	std::vector<std::vector<Cvl::Match>> matchesPerFrame;
+	for (auto const& image : images)
+	{
+		Eigen::Array2Xd corners = Cvl::ChessboardCornerDetector::findCorners(image, cornersPerRow, cornersPerCol, true);
+		Cvl::ChessboardSegmentation::Result segmentationResult = Cvl::ChessboardSegmentation::match(image, corners, cornersPerRow, cornersPerCol);
+		if (segmentationResult.mSuccessful)
+		{
+			imagePointsPerFrame.push_back(corners);
+			matchesPerFrame.push_back(segmentationResult.mMatches);
+		}
+		std::cout << segmentationResult.mSuccessful << " / " << segmentationResult.mUnambiguous << std::endl;
+
+		// all corners
+		for (int i = 0; i<corners.cols(); ++i)
+		{
+			cv::circle(image, cv::Point((int)corners(0, i), (int)corners(1, i)), 3, 255, 2);
+		}
+
+		// matches
+		for (auto const& match : segmentationResult.mMatches)
+		{
+			Eigen::Array2d p = corners.col(match.mMeasuredId);
+			cv::putText(image, std::to_string(match.mTemplateId), cv::Point((int)p.x() + 5, (int)p.y() - 4), cv::FONT_HERSHEY_SIMPLEX, 0.5, 255, 1);
+		}
+
+		cv::imshow("Points", image);
+		cv::waitKey(0);
+	}
+
+	Cvl::CameraModel cameraModel = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::PinholeModel>();
+	Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, cameraModel);
+	std::cout << cameraModel.getAllParameters() << std::endl;
+}
+
+void fullCalibrationTest()
+{
 	int const cornersPerRow = 9;
 	int const cornersPerCol = 6;
 	double const squareLength = 26; // mm
@@ -211,7 +287,15 @@ int main(int argc, char *argv[])
 	//Cvl::IntrinsicCameraCalibration::calibrate(templatePoints, imagePointsPerFrame, matchesPerFrame, cameraModel);
 
 	testAllModels(templatePoints, imagePointsPerFrame, matchesPerFrame);
+}
 
+
+int main(int argc, char *argv[])
+{
+	//someTests();
+	calibrateWebcam();
+	//fullCalibrationTest();
+	
 	system("pause");
 	return 0;
 

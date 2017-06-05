@@ -6,6 +6,7 @@
 #include <ComputerVisionLib/CameraModel/ProjectionModel/PinholeModel.h>
 #include <ComputerVisionLib/Reconstruction/HomographyCalculation.h>
 #include <ComputerVisionLib/Reconstruction/ModelViewFromHomography.h>
+#include <ComputerVisionLib/Reconstruction/ReconstructionError.h>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -16,25 +17,80 @@
 #include <iostream>
 #include <chrono>
 #include <string>
+#include <fstream>
 
 using namespace std;
 
 
-void reconstructImage(cv::Mat const & image, Eigen::Affine3d const & modelView, Cvl::CameraModel const & cameraModel, double offset)
+void reconstructImage(
+	cv::Mat const & image, 
+	Eigen::Affine3d const & modelView, 
+	Cvl::CameraModel const & cameraModel, 
+	double offset, 
+	cv::Mat & recoImage,
+	cv::Mat & recoWeightsImage)
 {
+
+	cv::Mat testImage = image.clone();
+
+	int const intensityThreshold = 60;
+	int const minLength = 5;
+	int const maxLength = 40;
+
 	Eigen::Vector3d normal = modelView.linear().col(2);
 	double d = normal.dot(modelView.translation()+(offset*normal)); 
 	Eigen::Vector3d ray;
 	Eigen::Vector3d intersection;
 
-	for (size_t y = 0; y < image.rows; ++y)
+	for (int y = 0; y < image.rows; ++y)
 	{
-		for (size_t x = 0; x < image.rows; ++x)
+		// find x coordinate of laser line
+		bool lineStarted = false;
+		double xTotal = 0.0;
+		int numPixels = 0;
+		double totalWeight = 0.0;
+		unsigned char intensity = 0;
+		bool lineFound = false;
+		double lineX = 0.0;
+		int x = 0;
+
+		while (x < image.rows && !lineFound)
 		{
+			intensity = image.at<unsigned char>(y, x);
+			if (intensity >= intensityThreshold)
+			{
+				lineStarted = true;
+				xTotal += (double)(x*intensity);
+				++numPixels;
+				totalWeight += intensity;
+			}
+			else if (lineStarted && intensity < intensityThreshold)
+			{
+				lineStarted = false;
+				if (numPixels > minLength && numPixels < maxLength)
+				{
+					lineX = xTotal/totalWeight;
+					lineFound = true;
+				}
+				xTotal = 0.0;
+				numPixels = 0;
+				totalWeight = 0.0;
+			}
+			++x;
+		}
+
+		if (lineFound)
+		{
+			testImage.at<unsigned char>(y, (int)lineX) = 255;
 			ray = cameraModel.unprojectAndUndistort(Eigen::Array2d((double)x, (double)y)).matrix().homogeneous().normalized();
 			intersection = ray * d / (ray.dot(normal));
+
+			recoImage.at<cv::Vec3d>    (y, (int)lineX) += cv::Vec3d(intersection.x(), intersection.y(), intersection.z());
+			recoWeightsImage.at<double>(y, (int)lineX) += 1.0;
 		}
 	}
+
+	cv::imshow("testImage", testImage);
 }
 
 std::tuple<bool, double, Eigen::Affine3d> calculateModelView(
@@ -70,9 +126,9 @@ std::tuple<bool, double, Eigen::Affine3d> calculateModelView(
 int main(int argc, char *argv[])
 {
 	// template points
-	size_t const cornersPerRow = 9;
-	size_t const cornersPerCol = 6;
-	double const squareLength = 26; // mm
+	size_t const cornersPerRow = 3;
+	size_t const cornersPerCol = 4;
+	double const squareLength = 10; // mm
 	Eigen::Array2Xd templatePoints(2, cornersPerRow*cornersPerCol);
 	int templateIndex = 0;
 	for (int y = 0; y < cornersPerCol; ++y)
@@ -87,14 +143,14 @@ int main(int argc, char *argv[])
 	// camera model
 	Cvl::CameraModel cameraModel = Cvl::CameraModel::create<Cvl::BrownModel, Cvl::PinholeModel>();
 	Eigen::VectorXd cameraParameters(8);
-	cameraParameters(0) = 0.0;
-	cameraParameters(1) = 0.0;
-	cameraParameters(2) = 0.0;
-	cameraParameters(3) = 0.0;
-	cameraParameters(4) = 0.0;
-	cameraParameters(5) = 0.0;
-	cameraParameters(6) = 0.0;
-	cameraParameters(7) = 0.0;
+	cameraParameters(0) = -665.96;
+	cameraParameters(1) = -666.215;
+	cameraParameters(2) = 328.892;
+	cameraParameters(3) = 241.901;
+	cameraParameters(4) = -4.5598e-05;
+	cameraParameters(5) = 5.71782e-05;
+	cameraParameters(6) = -0.0265902;
+	cameraParameters(7) = 0.0454921;
 	cameraModel.setAllParameters(cameraParameters);
 
 	// open video stream
@@ -109,44 +165,89 @@ int main(int argc, char *argv[])
 	// initialization
 	cv::Mat cleanImage;
 	cv::Mat imageMask;
-	cv::Mat imageC;
-	cv::Mat image;
+	cv::Mat coloredImage;
+	cv::Mat greyImage;
+	cv::Mat guiImage;
+	cv::Mat diffImage;
+	cv::Mat channels[3];
+	cv::Mat recoImage;
+	cv::Mat recoWeightsImage;
 
-	Eigen::Affine3d modelView;
+	Eigen::Affine3d modelView; 
+	Eigen::Array2Xd projectedPoints;
 
 	bool success = false;
 	double error = 0.0;
 	double const maxError = 1.0;
-	double const laserPointerOffset = 3.0;
+	double const laserPointerOffset = 9.0; // mm
+
 
 	// set a clean image
-	for (;;)
+	while (cv::waitKey(30) != 32)
 	{
-		cap >> imageC;
-		cvtColor(imageC, image, cv::COLOR_BGR2GRAY);
-		cv::imshow("Set a clean image!", image);
-		if (cv::waitKey(30) >= 0)
-		{
-			cleanImage = image;
-			break;
-		}
+		cap >> coloredImage;
+		cv::imshow("Set a first image.", coloredImage);
 	}
+	cleanImage = cv::Mat::zeros(coloredImage.size(), CV_8UC1);
+	int const numInitImages = 20;
+	for (int i = 0 ; i < numInitImages; ++i)
+	{
+		cap >> coloredImage;
+		cv::split(coloredImage, channels);
+		cleanImage += channels[2] / numInitImages;
+	}
+	recoImage = cv::Mat::zeros(cleanImage.rows, cleanImage.cols, CV_64FC3);
+	recoWeightsImage = cv::Mat::zeros(cleanImage.rows, cleanImage.cols, CV_64FC1);
+	cv::destroyAllWindows();
 
 	// main loop
-	for (;;)
+	while (cv::waitKey(30) != 27)
 	{
-		cap >> imageC;
-		cvtColor(imageC, image, cv::COLOR_BGR2GRAY);
-		std::tie(success, error, modelView) = calculateModelView(image, cameraModel, templatePoints, cornersPerRow, cornersPerCol);
-		std::cout << error << std::endl;
+		cap >> coloredImage;
+		cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
+		guiImage = coloredImage.clone();
+		std::tie(success, error, modelView) = calculateModelView(greyImage, cameraModel, templatePoints, cornersPerRow, cornersPerCol);
 		if (success && error < maxError)
 		{
+			projectedPoints = Cvl::ReconstructionError::project(modelView, cameraModel, templatePoints);
+			for (Eigen::Index i=0; i<projectedPoints.cols(); ++i)
+			{
+				cv::circle(guiImage, cv::Point((int)std::round(projectedPoints(0, i)), (int)std::round(projectedPoints(1, i))), 3, 255, 2);
+			}
+			cv::split(coloredImage, channels);
+			cv::absdiff(channels[2], cleanImage, diffImage);
+			cv::GaussianBlur(diffImage, diffImage, cv::Size(0, 0), 2.0);
 
+			reconstructImage(diffImage, modelView, cameraModel, laserPointerOffset, recoImage, recoWeightsImage);
+
+			cv::imshow("Diff", diffImage);
+		} 
+		else
+		{
+			std::cout << "Tracking lost or high error: " << error << " / " << success << std::endl;
 		}
+		cv::imshow("Scan ...", guiImage);
+	}
 
-		cv::imshow("Image", image);
-		if (cv::waitKey(30) >= 0)
-			break;
+	// write obj file
+	std::ofstream objFile("scan.obj");
+	if (objFile.is_open())
+	{
+		cv::Vec3d p;
+		double w;
+		for (int y = 0; y < recoImage.rows; ++y)
+		{
+			for (int x = 0; x < recoImage.rows; ++x)
+			{
+				w = recoWeightsImage.at<double>(y, x);
+				if (w > 0.0)
+				{
+					p = recoImage.at<cv::Vec3d>(y, x);
+					objFile << "v " << p(0) / w << " " << p(1) / w << " " << p(2) / w << " \n";
+				}
+			}
+		}
+		objFile.close();
 	}
 
 	return 0;
