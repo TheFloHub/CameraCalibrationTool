@@ -26,22 +26,44 @@ void reconstructImage(
 	cv::Mat const & image, 
 	Eigen::Affine3d const & modelView, 
 	Cvl::CameraModel const & cameraModel, 
-	double offset, 
+	double const offset, 
+	size_t const cornersPerRow,
+	size_t const cornersPerCol,
+	Eigen::Array2Xd const & projectedPoints,
 	cv::Mat & recoImage,
 	cv::Mat & recoWeightsImage)
 {
-
 	cv::Mat testImage = image.clone();
-
+	
+	// params
 	int const intensityThreshold = 60;
 	int const minLength = 5;
 	int const maxLength = 40;
 
+	// find min and max x
+	int rangeMinX = 0;
+	int rangeMaxX = image.rows;
+	Eigen::Index minRow, minCol;
+	double minPx = projectedPoints.row(0).minCoeff(&minRow, &minCol);
+
+	if ((size_t) minCol >= cornersPerRow*(cornersPerCol-1))
+	{
+		rangeMaxX = (int)minPx - 20;
+		cv::line(testImage, cv::Point(rangeMaxX, 0), cv::Point(rangeMaxX, image.rows), 255);
+	}
+	else
+	{
+		rangeMinX = (int) projectedPoints.row(0).maxCoeff() + 20;
+		cv::line(testImage, cv::Point(rangeMinX, 0), cv::Point(rangeMinX, image.rows), 255);
+	}
+	
+	// plane params
 	Eigen::Vector3d normal = modelView.linear().col(2);
 	double d = normal.dot(modelView.translation()+(offset*normal)); 
 	Eigen::Vector3d ray;
 	Eigen::Vector3d intersection;
 
+	// find laser line in each image row
 	for (int y = 0; y < image.rows; ++y)
 	{
 		// find x coordinate of laser line
@@ -52,9 +74,9 @@ void reconstructImage(
 		unsigned char intensity = 0;
 		bool lineFound = false;
 		double lineX = 0.0;
-		int x = 0;
+		int x = rangeMinX;
 
-		while (x < image.rows && !lineFound)
+		while (x < rangeMaxX && !lineFound)
 		{
 			intensity = image.at<unsigned char>(y, x);
 			if (intensity >= intensityThreshold)
@@ -82,7 +104,7 @@ void reconstructImage(
 		if (lineFound)
 		{
 			testImage.at<unsigned char>(y, (int)lineX) = 255;
-			ray = cameraModel.unprojectAndUndistort(Eigen::Array2d((double)x, (double)y)).matrix().homogeneous().normalized();
+			ray = cameraModel.unprojectAndUndistort(Eigen::Array2d(lineX + 0.5, (double)y + 0.5)).matrix().homogeneous().normalized();
 			intersection = ray * d / (ray.dot(normal));
 
 			recoImage.at<cv::Vec3d>    (y, (int)lineX) += cv::Vec3d(intersection.x(), intersection.y(), intersection.z());
@@ -125,6 +147,10 @@ std::tuple<bool, double, Eigen::Affine3d> calculateModelView(
 
 int main(int argc, char *argv[])
 {
+	// other params
+	double const maxError = 1.0;
+	double const laserPointerOffset = -9.0; // mm
+
 	// template points
 	size_t const cornersPerRow = 3;
 	size_t const cornersPerCol = 4;
@@ -164,7 +190,6 @@ int main(int argc, char *argv[])
 
 	// initialization
 	cv::Mat cleanImage;
-	cv::Mat imageMask;
 	cv::Mat coloredImage;
 	cv::Mat greyImage;
 	cv::Mat guiImage;
@@ -178,9 +203,6 @@ int main(int argc, char *argv[])
 
 	bool success = false;
 	double error = 0.0;
-	double const maxError = 1.0;
-	double const laserPointerOffset = 9.0; // mm
-
 
 	// set a clean image
 	while (cv::waitKey(30) != 32)
@@ -218,7 +240,10 @@ int main(int argc, char *argv[])
 			cv::absdiff(channels[2], cleanImage, diffImage);
 			cv::GaussianBlur(diffImage, diffImage, cv::Size(0, 0), 2.0);
 
-			reconstructImage(diffImage, modelView, cameraModel, laserPointerOffset, recoImage, recoWeightsImage);
+			reconstructImage(
+				diffImage, modelView, cameraModel, laserPointerOffset, 
+				cornersPerRow, cornersPerCol, projectedPoints, 
+				recoImage, recoWeightsImage);
 
 			cv::imshow("Diff", diffImage);
 		} 
