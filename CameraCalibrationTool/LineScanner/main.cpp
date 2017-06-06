@@ -36,9 +36,9 @@ void reconstructImage(
 	cv::Mat testImage = image.clone();
 	
 	// params
-	int const intensityThreshold = 60;
+	int const intensityThreshold = 40;
 	int const minLength = 5;
-	int const maxLength = 40;
+	int const maxLength = 30;
 
 	// find min and max x
 	int rangeMinX = 0;
@@ -48,12 +48,12 @@ void reconstructImage(
 
 	if ((size_t) minCol >= cornersPerRow*(cornersPerCol-1))
 	{
-		rangeMaxX = (int)minPx - 20;
+		rangeMaxX = (int)minPx - 50;
 		cv::line(testImage, cv::Point(rangeMaxX, 0), cv::Point(rangeMaxX, image.rows), 255);
 	}
 	else
 	{
-		rangeMinX = (int) projectedPoints.row(0).maxCoeff() + 20;
+		rangeMinX = (int) projectedPoints.row(0).maxCoeff() + 50;
 		cv::line(testImage, cv::Point(rangeMinX, 0), cv::Point(rangeMinX, image.rows), 255);
 	}
 	
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 {
 	// other params
 	double const maxError = 1.0;
-	double const laserPointerOffset = -9.0; // mm
+	double const laserPointerOffset = -10.0; // mm
 
 	// template points
 	size_t const cornersPerRow = 3;
