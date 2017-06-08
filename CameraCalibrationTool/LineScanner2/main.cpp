@@ -41,13 +41,13 @@ void reconstructImage(
 	
 	
 	
-	std::vector<cv::Vec4i> lines;
-	cv::HoughLinesP(image, lines, 1, CV_PI / 180, 80, 30, 10);
-	for (size_t i = 0; i < lines.size(); i++)
-	{
-		cv::line(guiImage, cv::Point(lines[i][0], lines[i][1]),
-			cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 255), 3, 8);
-	}
+	//std::vector<cv::Vec4i> lines;
+	//cv::HoughLinesP(image, lines, 1, CV_PI / 180, 80, 30, 10);
+	//for (size_t i = 0; i < lines.size(); i++)
+	//{
+	//	cv::line(guiImage, cv::Point(lines[i][0], lines[i][1]),
+	//		cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 255), 3, 8);
+	//}
 
 
 
@@ -62,7 +62,7 @@ void reconstructImage(
 	size_t numberOfPlanePoints = 0;
 	Eigen::Vector3d ray;
 	Eigen::Vector3d intersection;
-	for (int x = 0; x < image.rows; ++x)
+	for (int x = 0; x < image.cols; ++x)
 	{
 		// find y coordinate of laser line
 		double yTotal = 0.0;
@@ -71,7 +71,7 @@ void reconstructImage(
 		unsigned char intensity = 0;
 		double lineY = 0.0;
 
-		for (int y = 0; y < image.cols; ++y)
+		for (int y = 0; y < image.rows; ++y)
 		{
 			if (objectMask.at<unsigned char>(y, x) == 0)
 			{
@@ -117,7 +117,7 @@ void reconstructImage(
 
 	// reconstruct object
 	// find laser line in each image column and reconstruct the point
-	for (int x = 0; x < image.rows; ++x)
+	for (int x = 0; x < image.cols; ++x)
 	{
 		// find y coordinate of laser line
 		double yTotal = 0.0;
@@ -126,7 +126,7 @@ void reconstructImage(
 		unsigned char intensity = 0;
 		double lineY = 0.0;
 
-		for (int y = 0; y < image.cols; ++y)
+		for (int y = 0; y < image.rows; ++y)
 		{
 			if (objectMask.at<unsigned char>(y, x) != 0)
 			{
@@ -187,13 +187,13 @@ int main(int argc, char *argv[])
 	// other params
 	double const maxError = 1.0;
 	int const numInitImages = 20;
-	double const diffThreshold = 40;
+	double const diffThreshold = 15;
 	int const erodeSize = 11;
 
 	// template points
 	size_t const cornersPerRow = 3;
-	size_t const cornersPerCol = 4;
-	double const squareLength = 10; // mm
+	size_t const cornersPerCol = 8;
+	double const squareLength = 20; // mm
 	Eigen::Array2Xd templatePoints(2, cornersPerRow*cornersPerCol);
 	int templateIndex = 0;
 	for (int y = 0; y < cornersPerCol; ++y)
@@ -231,6 +231,7 @@ int main(int argc, char *argv[])
 	cv::Mat coloredImage;
 	cv::Mat greyImage;
 	cv::Mat planesGreyImage;	
+	cv::Mat planesColoredImage;
 	cv::Mat planesImageLeft;
 	cv::Mat planesImageRight;
 	cv::Mat objectGreyImage;
@@ -238,6 +239,7 @@ int main(int argc, char *argv[])
 	cv::Mat diffImage;
 	cv::Mat recoImage;
 	cv::Mat recoWeightsImage;
+	cv::Mat objectMaskColored;
 	cv::Mat objectMask;
 
 	bool success = false;
@@ -257,11 +259,13 @@ int main(int argc, char *argv[])
 	cv::destroyAllWindows();
 
 	planesGreyImage = cv::Mat::zeros(coloredImage.size(), CV_8UC1);
+	planesColoredImage = cv::Mat::zeros(coloredImage.size(), CV_8UC3);
 	for (int i = 0; i < numInitImages; ++i)
 	{
 		cap >> coloredImage;
 		cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
 		planesGreyImage += greyImage / numInitImages;
+		planesColoredImage += coloredImage / numInitImages;
 	}
 	planesImageLeft = planesGreyImage.clone();
 	planesImageLeft.colRange(imageWidthHalf, coloredImage.cols).setTo(0);
@@ -299,10 +303,12 @@ int main(int argc, char *argv[])
 		objectGreyImage += greyImage / numInitImages;
 		objectColoredImage += coloredImage / numInitImages;
 	}
-	cv::absdiff(objectGreyImage, planesGreyImage, objectMask);
+	cv::absdiff(objectColoredImage, planesColoredImage, objectMaskColored);
+	cvtColor(objectMaskColored, objectMask, cv::COLOR_BGR2GRAY);
 	cv::threshold(objectMask, objectMask, diffThreshold, 255, cv::THRESH_BINARY);
-	cv::erode(objectMask, objectMask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(erodeSize, erodeSize)));
+	//cv::erode(objectMask, objectMask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(erodeSize, erodeSize)));
 	cv::imshow("MASK", objectMask);
+	cv::waitKey(0);
 
 	//--------------- 3. SCAN ----------------------------
 	std::cout << "Now you can scan your object." << std::endl;
