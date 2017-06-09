@@ -32,8 +32,8 @@ void reconstructImage(
 	cv::Mat & guiImage) // colored
 {
 	// params 
-	unsigned char const minIntensity = 15;
-	int const minNumberOfPixels = 3;
+	unsigned char const minIntensity = 30;
+	int const minNumberOfPixels = 4;
 
 	// reconstruct laser plane
 
@@ -108,13 +108,16 @@ void reconstructImage(
 
 	Eigen::Vector3d mean = planePoints.rowwise().mean();
 	Eigen::Matrix3Xd centeredPlanePoints = planePoints.colwise() - mean;
-	Eigen::Vector3d normal = centeredPlanePoints.jacobiSvd(Eigen::ComputeFullV).matrixV().col(3).head<3>();
+	Eigen::Matrix3d covar = centeredPlanePoints*centeredPlanePoints.transpose();
+
+	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(covar);
+	if (eigensolver.info() != Eigen::Success)
+		return;
+
+	Eigen::Vector3d normal = eigensolver.eigenvectors().col(0); // correct one???????????????????????????????????????????
+	//Eigen::Vector3d normal = centeredPlanePoints.jacobiSvd(Eigen::ComputeFullV).matrixV().col(3).head<3>();
 	double d = normal.dot(mean);
-
-	// https://stackoverflow.com/questions/39370370/eigen-and-svd-to-find-best-fitting-plane-given-a-set-of-points
-	// google eigen plane fitting
-
-
+	
 	// reconstruct object
 	// find laser line in each image column and reconstruct the point
 	for (int x = 0; x < image.cols; ++x)
@@ -187,9 +190,10 @@ int main(int argc, char *argv[])
 	// other params
 	double const maxError = 1.0;
 	int const numInitImages = 20;
-	double const diffThreshold = 15;
-	int const erodeSize = 11;
-
+	int diffThreshold = 15;
+	int dilateIters = 3;
+	int erodeIters = 3;
+	
 	// template points
 	size_t const cornersPerRow = 3;
 	size_t const cornersPerCol = 8;
@@ -252,6 +256,7 @@ int main(int argc, char *argv[])
 	while (cv::waitKey(30) != 32)
 	{
 		cap >> coloredImage;
+		cv::equalizeHist(coloredImage, coloredImage); // ?????????????????????????????????????????????
 		cv::line(coloredImage, cv::Point(coloredImage.cols/2, 0), cv::Point(coloredImage.cols / 2, coloredImage.rows), 255);
 		cv::imshow("Place the two planes and press space.", coloredImage);
 	}
@@ -263,7 +268,7 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < numInitImages; ++i)
 	{
 		cap >> coloredImage;
-		cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
+		cv::cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
 		planesGreyImage += greyImage / numInitImages;
 		planesColoredImage += coloredImage / numInitImages;
 	}
@@ -299,16 +304,50 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < numInitImages; ++i)
 	{
 		cap >> coloredImage;
-		cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
+		cv::cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
 		objectGreyImage += greyImage / numInitImages;
 		objectColoredImage += coloredImage / numInitImages;
 	}
-	cv::absdiff(objectColoredImage, planesColoredImage, objectMaskColored);
-	cvtColor(objectMaskColored, objectMask, cv::COLOR_BGR2GRAY);
-	cv::threshold(objectMask, objectMask, diffThreshold, 255, cv::THRESH_BINARY);
-	//cv::erode(objectMask, objectMask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(erodeSize, erodeSize)));
-	cv::imshow("MASK", objectMask);
-	cv::waitKey(0);
+
+	//--------------- 3. CREATE THE OBJECT MASK ----------------------------
+	cv::namedWindow("Mask");
+	cv::createTrackbar("Threshold", "Mask", &diffThreshold, 200);
+	cv::createTrackbar("Dilate Iters", "Mask", &dilateIters, 100);
+	cv::createTrackbar("Erode Iters", "Mask", &erodeIters, 100);
+	cv::Mat planeHSV;
+	cv::Mat objectHSV;
+	cv::cvtColor(objectColoredImage, objectHSV, cv::COLOR_BGR2HSV);
+	cv::cvtColor(planesColoredImage, planeHSV, cv::COLOR_BGR2HSV);
+	objectMask = cv::Mat::zeros(objectGreyImage.size(), CV_8UC1);
+	cv::Vec3b c1;
+	cv::Vec3b c2;
+	while (cv::waitKey(30) != 32)
+	{
+		cv::absdiff(planeHSV, objectHSV, objectMaskColored);
+		cv::Mat channels[3];
+		cv::split(objectMaskColored, channels);
+
+		cv::imshow("H", channels[0]);
+		cv::imshow("S", channels[1]);
+		cv::imshow("V", channels[2]);
+
+		//cvtColor(objectMaskColored, objectMask, cv::COLOR_BGR2GRAY);
+		//cv::threshold(objectMask, objectMask, diffThreshold, 255, cv::THRESH_BINARY);
+
+		//cv::dilate(objectMask, objectMask, cv::Mat(), cv::Point(-1, -1), dilateIters);
+		//cv::erode(objectMask, objectMask, cv::Mat(), cv::Point(-1, -1), erodeIters);
+		//cv::imshow("Mask", objectMask);
+		
+		// only max value
+		//for (int x = 0; x < objectMask.cols; ++x)
+		//{
+		//	for (int y = 0; y < objectMask.rows; ++y)
+		//	{
+		//		c1 = 
+		//	}
+		//}
+	}
+
 
 	//--------------- 3. SCAN ----------------------------
 	std::cout << "Now you can scan your object." << std::endl;
@@ -317,6 +356,7 @@ int main(int argc, char *argv[])
 
 	while (cv::waitKey(30) != 27)
 	{
+		// convert to HSV??
 		cap >> coloredImage;
 		cvtColor(coloredImage, greyImage, cv::COLOR_BGR2GRAY);
 		cv::absdiff(greyImage, objectGreyImage, diffImage);
